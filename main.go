@@ -14,10 +14,10 @@ import (
   "github.com/aws/aws-sdk-go/aws/endpoints"
   "os"
   "os/exec"
+  "os/user"
   "log"
   "errors"
   "io"
-  "path/filepath"
 )
 
 type EcsToolConfig struct {
@@ -36,7 +36,6 @@ func readConfig(path string) (EcsToolConfig, error) {
   if (err != nil) {
     return EcsToolConfig{}, errors.New("Config file has invalid json")
   }
-  fmt.Println(config)
   return config, nil;
 }
 
@@ -59,7 +58,8 @@ func handleErr(err error) {
 }
 
 func main() {
-  path, _ := filepath.Abs("config.json")
+  currUser, _ := user.Current()
+  path := currUser.HomeDir + "/.ecstool/config.json"
   config, err := readConfig(path)
   if (err != nil) {
     panic(err)
