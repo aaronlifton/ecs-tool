@@ -1,0 +1,5 @@
+{
+  "KeyPath": "/Users/aaron/Downloads/consul_key.pem",
+  "SshUser": "ec2-user",
+  "AlwaysEnterContainer": true
+}

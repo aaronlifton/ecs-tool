@@ -53,8 +53,7 @@ func handleErr(err error) {
         fmt.Println(aerr.Error())
     }
   } else {
-    // Print the error, cast err to awserr.Error to get the Code and
-    // Message from an error.
+    // cast err to awserr.Error
     fmt.Println(err.Error())
   }
 }
@@ -80,12 +79,7 @@ func main() {
   }
 
   clusterArn := *result.ClusterArns[0]
-  // fmt.Println(clusterArn)
 
-  // input2 := &ecs.ListServicesInput{Cluster: &clusterArn}
-  // result2, err := svc.ListServices(input2)
-
-  // serviceName := "dstld-blue-STAGING"
   serviceNameErr := errors.New("You must pass the service name as the first argument.")
 
   if (len(os.Args) < 2) {
@@ -98,6 +92,8 @@ func main() {
     return
   }
 
+  // input2 := &ecs.ListServicesInput{Cluster: &clusterArn}
+  // result2, err := svc.ListServices(input2)
   // var serviceArn string
   // for a := range result2.ServiceArns {
   //   arn := *result2.ServiceArns[a]
@@ -116,7 +112,6 @@ func main() {
       return
   }
   taskArn := *result3.TaskArns[0]
-  // fmt.Println(taskArn)
 
   input4 := &ecs.DescribeTasksInput{
     Cluster: &clusterArn,
@@ -131,7 +126,6 @@ func main() {
   }
   instanceArn := *result4.Tasks[0].ContainerInstanceArn
   containerName := *result4.Tasks[0].Containers[0].Name
-  // fmt.Println(result4)
 
   input5 := &ecs.DescribeContainerInstancesInput{
     Cluster: &clusterArn,
@@ -143,9 +137,9 @@ func main() {
 
   instanceId := *result5.ContainerInstances[0].Ec2InstanceId
 
-  svc2 := ec2.New(sess)
+  ec2svc := ec2.New(sess)
   input6 := &ec2.DescribeInstancesInput{InstanceIds: []*string{&instanceId}}
-  result6, err := svc2.DescribeInstances(input6)
+  result6, err := ec2svc.DescribeInstances(input6)
   if err != nil {
     handleErr(err)
     return
@@ -155,15 +149,21 @@ func main() {
 
   // Docker Web API
   resp, err := http.Get(strings.Join([]string{"http://", publicIp, ":51678/v1/tasks"},""))
+  defer resp.Body.Close()
   if err != nil {
     handleErr(err)
     return
   }
-  defer resp.Body.Close()
   body, err := ioutil.ReadAll(resp.Body)
+  if err != nil {
+    handleErr(err)
+    return
+  }
 
   type TasksResponse struct {
     Tasks []struct{
+      Family string
+      KnownStatus string
       Containers []struct {
         Name string
         DockerId string
@@ -178,12 +178,17 @@ func main() {
     return
   }
 
-  // fmt.Println(containerName)
-  // fmt.Println(taskIntrospectionMap)
-
-
   var dockerId string
+  if (len(taskIntrospectionMap.Tasks) == 0) {
+    handleErr(errors.New("No tasks found on server " + publicIp))
+    return
+  }
   for _, v := range taskIntrospectionMap.Tasks {
+    if (len(v.Containers) == 0) {
+      handleErr(errors.New("No containers found for task " + v.Family + " on server " + publicIp +
+        "\n Task state is " + v.KnownStatus))
+      return
+    }
     container := v.Containers[0]
     if container.Name == containerName {
       dockerId = container.DockerId
@@ -203,10 +208,10 @@ func main() {
       fmt.Sprintf("ec2-user@%s", publicIp),
       fmt.Sprintf("-i %s", config.KeyPath))
   }
-  // cmd.Env = append(cmd.Env, "TERM=xterm")
+
   cmd.Stdout = os.Stdout
   cmd.Stderr = os.Stderr
-  cmd.Stdin = os.Stdin // Pseudo-terminal will not be allocated because stdin is not a terminal.
+  cmd.Stdin = os.Stdin
 
   fmt.Println(fmt.Sprintf("Executing ec2-user@%s -i %s ...", publicIp, config.KeyPath))
   err = cmd.Run()
@@ -227,7 +232,6 @@ func main() {
   }()
 
   // 2018/12/20 17:25:07 exec: Stdin already set
-
 }
 
 
