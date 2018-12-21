@@ -1,7 +1,8 @@
 # ECSTool
 
 ## Usage
-1. `./ecstool myapp-STAGING`
+1. `mv build/ecstool /usr/local/bin/`
+2. `ecstool myapp-STAGING`
 
 
 ## Config
