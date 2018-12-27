@@ -17,7 +17,7 @@ import (
   "os/user"
   "log"
   "errors"
-  "io"
+  // "./awsutil"
 )
 
 type EcsToolConfig struct {
@@ -66,7 +66,7 @@ func main() {
   }
 
   sess := session.Must(session.NewSession(&aws.Config{
-      Region: aws.String(endpoints.UsWest2RegionID),
+    Region: aws.String(endpoints.UsWest2RegionID),
   }))
 
   svc := ecs.New(sess)
@@ -74,8 +74,8 @@ func main() {
 
   result, err := svc.ListClusters(input)
   if err != nil {
-      handleErr(err)
-      return
+    handleErr(err)
+    return
   }
 
   clusterArn := *result.ClusterArns[0]
@@ -92,27 +92,17 @@ func main() {
     return
   }
 
-  // input2 := &ecs.ListServicesInput{Cluster: &clusterArn}
-  // result2, err := svc.ListServices(input2)
-  // var serviceArn string
-  // for a := range result2.ServiceArns {
-  //   arn := *result2.ServiceArns[a]
-  //   if strings.Contains(arn, serviceName) {
-  //     serviceArn = arn
-  //   }
-  // }
-
-  // fmt.Println(result2)
-  // fmt.Println(serviceArn)
+  // res := awsutil.GetServiceArn(svc, clusterArn, serviceName)
+  // fmt.Println(res)
 
   input3 := &ecs.ListTasksInput{Cluster: &clusterArn, ServiceName: &serviceName}
   result3, err := svc.ListTasks(input3)
   if err != nil {
-      handleErr(err)
-      return
+    handleErr(err)
+    return
   }
-  taskArn := *result3.TaskArns[0]
 
+  taskArn := *result3.TaskArns[0]
   input4 := &ecs.DescribeTasksInput{
     Cluster: &clusterArn,
     Tasks: []*string{
@@ -124,9 +114,14 @@ func main() {
     handleErr(err)
     return
   }
+
+  if len(result4.Tasks) == 0 {
+    handleErr(errors.New("No tasks found for service " + serviceName))
+    return
+  }
+
   instanceArn := *result4.Tasks[0].ContainerInstanceArn
   containerName := *result4.Tasks[0].Containers[0].Name
-
   input5 := &ecs.DescribeContainerInstancesInput{
     Cluster: &clusterArn,
     ContainerInstances: []*string{
@@ -136,7 +131,6 @@ func main() {
   result5, err := svc.DescribeContainerInstances(input5)
 
   instanceId := *result5.ContainerInstances[0].Ec2InstanceId
-
   ec2svc := ec2.New(sess)
   input6 := &ec2.DescribeInstancesInput{InstanceIds: []*string{&instanceId}}
   result6, err := ec2svc.DescribeInstances(input6)
@@ -220,17 +214,10 @@ func main() {
   }
 
   // cmd2 := exec.Command("source", "/etc/default/app")
-
-  stdin, err := cmd.StdinPipe()
-  if err != nil {
-    log.Fatal(err)
-  }
-
-  go func() {
-    defer stdin.Close()
-    io.WriteString(stdin, "values written to stdin are passed to cmd's standard input")
-  }()
-
+  // stdin, err := cmd.StdinPipe()
+  // if err != nil {
+  //   log.Fatal(err)
+  // }
   // 2018/12/20 17:25:07 exec: Stdin already set
 }
 
